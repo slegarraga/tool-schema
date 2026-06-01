@@ -1,0 +1,78 @@
+{
+  "name": "tool-schema",
+  "version": "0.1.0",
+  "description": "Convert any JSON Schema into a valid tool / function calling schema for OpenAI, Anthropic, Gemini and MCP. Zero dependencies.",
+  "keywords": [
+    "openai",
+    "anthropic",
+    "claude",
+    "gemini",
+    "mcp",
+    "model-context-protocol",
+    "function-calling",
+    "tool-use",
+    "tool-calling",
+    "json-schema",
+    "structured-outputs",
+    "llm",
+    "ai",
+    "agents",
+    "zod"
+  ],
+  "license": "MIT",
+  "author": "Sebastian Legarraga",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/slegarraga/tool-schema.git"
+  },
+  "homepage": "https://github.com/slegarraga/tool-schema#readme",
+  "bugs": {
+    "url": "https://github.com/slegarraga/tool-schema/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "tool-schema": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepublishOnly": "npm run build",
+    "prepare": "npm run build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/node": "^22.10.2",
+    "eslint": "^9.17.0",
+    "prettier": "^3.4.2",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.1",
+    "vitest": "^2.1.8"
+  }
+}

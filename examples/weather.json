@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "properties": {
+    "city": { "type": "string", "description": "City name" },
+    "units": { "type": "string", "enum": ["c", "f"], "description": "Temperature units" },
+    "when": { "type": "string", "format": "date" }
+  },
+  "required": ["city"],
+  "additionalProperties": true
+}
