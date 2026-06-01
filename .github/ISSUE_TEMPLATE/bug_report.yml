@@ -1,0 +1,44 @@
+name: Bug report
+description: Report a schema that converts incorrectly for a provider
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for the report. A minimal reproduction makes a bug fixable.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Which version of tool-schema?
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: target
+    attributes:
+      label: Target
+      description: Which target is affected?
+      options:
+        - openai
+        - openai-strict
+        - anthropic
+        - gemini
+        - gemini-jsonschema
+        - mcp
+    validations:
+      required: true
+  - type: textarea
+    id: input
+    attributes:
+      label: Input schema
+      description: The JSON Schema you passed in.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs actual
+      description: What you expected to get, and what you got instead (include any warnings).
+    validations:
+      required: true

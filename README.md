@@ -144,6 +144,12 @@ This library is meant to sit deep in agent and tool pipelines. No transitive
 dependencies means no supply chain surface, no version conflicts, and a tiny
 install. It uses only the JSON Schema you pass in and the platform `structuredClone`.
 
+## Part of a set
+
+`tool-schema` pairs with [`llm-messages`](https://github.com/slegarraga/llm-messages),
+which converts your chat **conversations** across the same providers. Together
+they let you write an agent once and run it on any LLM.
+
 ## License
 
 MIT (c) Sebastian Legarraga. See [LICENSE](./LICENSE).
