@@ -16,7 +16,8 @@ Every provider accepts a slightly different subset of JSON Schema for tool calli
 
 - **OpenAI** strict mode demands `additionalProperties: false` on every object and every property listed in `required`, and rejects `allOf`, `not` and `if/then/else`.
 - **Gemini** does not understand `$ref`, `oneOf`, `allOf` or `additionalProperties`, and expresses nullability as `nullable: true` instead of `type: ["string", "null"]`.
-- **Anthropic** and **MCP** are permissive but still require an object at the root.
+- **Anthropic** and **MCP input schemas** are permissive but still require an object at the root.
+- **MCP output schemas** describe `structuredContent` and can be any JSON Schema shape, including arrays and primitives.
 
 `tool-schema` knows these rules so you do not have to. Write your schema once, target any provider.
 
@@ -55,6 +56,35 @@ toTool(def, { target: 'openai' }); // { type: 'function', function: { ... } }
 toTool(def, { target: 'anthropic' }); // { name, description, input_schema }
 toTool(def, { target: 'gemini' }); // { name, description, parameters }
 toTool(def, { target: 'mcp' }); // { name, description, inputSchema, annotations? }
+```
+
+MCP tools can also publish an `outputSchema` for structured tool results:
+
+```ts
+toTool(
+  {
+    name: 'rank_files',
+    description: 'Rank files by relevance',
+    schema: {
+      type: 'object',
+      properties: { query: { type: 'string' } },
+      required: ['query'],
+    },
+    outputSchema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          path: { type: 'string' },
+          score: { type: 'number' },
+        },
+        required: ['path', 'score'],
+      },
+    },
+  },
+  { target: 'mcp' },
+);
+// -> { name, description, inputSchema, outputSchema }
 ```
 
 ## Convert just the schema
@@ -108,18 +138,19 @@ if (!ok) {
 | `anthropic`         | `input_schema`         | Permissive. Ensures an object root.                                                                                                |
 | `gemini`            | `parameters`           | OpenAPI subset: inlines `$ref`, strips `oneOf`/`allOf`/`additionalProperties`, `nullable: true`, string enums.                     |
 | `gemini-jsonschema` | `parametersJsonSchema` | Gemini's richer route. Keeps `$ref` and more.                                                                                      |
-| `mcp`               | `inputSchema`          | Most permissive. Ensures an object root. Supports `annotations`.                                                                   |
+| `mcp`               | `inputSchema`          | Most permissive for input. Ensures an object root. Supports `annotations` and `outputSchema`.                                      |
 
 ## Provider rules at a glance
 
-| Constraint                           | openai         | openai-strict            | anthropic      | gemini           | mcp  |
-| ------------------------------------ | -------------- | ------------------------ | -------------- | ---------------- | ---- |
-| Root must be object                  | yes            | yes                      | yes            | yes              | yes  |
-| `additionalProperties: false` forced | no             | yes (every object)       | no             | removed          | no   |
-| All properties required              | no             | yes (optionals nullable) | no             | no               | no   |
-| `$ref` / `$defs`                     | keep           | keep                     | keep           | inlined          | keep |
-| `oneOf` / `allOf` / `not`            | keep           | stripped / merged        | keep           | stripped         | keep |
-| Nullability                          | `["t","null"]` | `["t","null"]`           | `["t","null"]` | `nullable: true` | any  |
+| Constraint                           | openai         | openai-strict            | anthropic      | gemini           | mcp        |
+| ------------------------------------ | -------------- | ------------------------ | -------------- | ---------------- | ---------- |
+| Root must be object                  | yes            | yes                      | yes            | yes              | input only |
+| `additionalProperties: false` forced | no             | yes (every object)       | no             | removed          | no         |
+| All properties required              | no             | yes (optionals nullable) | no             | no               | no         |
+| `$ref` / `$defs`                     | keep           | keep                     | keep           | inlined          | keep       |
+| `oneOf` / `allOf` / `not`            | keep           | stripped / merged        | keep           | stripped         | keep       |
+| Nullability                          | `["t","null"]` | `["t","null"]`           | `["t","null"]` | `nullable: true` | any        |
+| Structured output schema             | no             | no                       | no             | no               | yes        |
 
 ## CLI
 

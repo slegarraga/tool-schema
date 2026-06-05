@@ -12,6 +12,7 @@ import { toOpenAI, toOpenAIStrict } from './targets/openai.js';
 import { toAnthropic } from './targets/anthropic.js';
 import { toGemini, toGeminiJsonSchema } from './targets/gemini.js';
 import { toMcp } from './targets/mcp.js';
+import { clone } from './util.js';
 
 const EMPTY_OBJECT_SCHEMA: JSONSchema = { type: 'object', properties: {} };
 
@@ -122,6 +123,7 @@ function buildTool(
         name,
         ...(description ? { description } : {}),
         inputSchema: schema,
+        ...(def.outputSchema ? { outputSchema: clone(def.outputSchema) } : {}),
         ...(def.annotations ? { annotations: def.annotations } : {}),
       };
     default:
