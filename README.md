@@ -9,6 +9,9 @@
 
 One JSON Schema in, a valid tool / function calling schema out, for **OpenAI**, **Anthropic**, **Gemini** and **MCP**. Zero dependencies.
 
+Security posture is tracked in [docs/security-posture.md](./docs/security-posture.md),
+including CodeQL, OpenSSF Scorecard, Dependabot and branch rules.
+
 Every provider accepts a slightly different subset of JSON Schema for tool calling, and the differences are exactly the kind that fail at runtime with a `400 invalid schema`:
 
 - **OpenAI** strict mode demands `additionalProperties: false` on every object and every property listed in `required`, and rejects `allOf`, `not` and `if/then/else`.
