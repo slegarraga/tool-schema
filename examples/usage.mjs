@@ -24,7 +24,20 @@ console.log('\n--- MCP tool with annotations ---');
 console.log(
   JSON.stringify(
     toTool(
-      { name: 'delete_file', description: 'Delete a file', schema, annotations: { destructiveHint: true } },
+      {
+        name: 'delete_file',
+        description: 'Delete a file',
+        schema,
+        outputSchema: {
+          type: 'object',
+          properties: {
+            deleted: { type: 'boolean' },
+            path: { type: 'string' },
+          },
+          required: ['deleted', 'path'],
+        },
+        annotations: { destructiveHint: true },
+      },
       { target: 'mcp' },
     ).tool,
     null,

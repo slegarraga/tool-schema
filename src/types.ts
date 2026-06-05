@@ -104,6 +104,12 @@ export interface ToolDefinition {
   description?: string;
   /** The parameters / input schema. Defaults to an empty object schema. */
   schema?: JSONSchema;
+  /**
+   * MCP only: JSON Schema for `structuredContent` returned by the tool.
+   * Preserved as standard JSON Schema 2020-12 and may describe arrays,
+   * primitives, objects or composition schemas.
+   */
+  outputSchema?: JSONSchema;
   /** MCP only: behavioural hints surfaced to clients. */
   annotations?: McpAnnotations;
 }
