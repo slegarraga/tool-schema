@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Added Vercel AI SDK adapter helpers: `toAISDKTool(...)` emits AI SDK v5
+  `inputSchema` tool definitions, and `fromAISDKTool(...)` converts AI SDK tools
+  into provider-specific OpenAI, Anthropic, Gemini or MCP tool shapes.
+- Added legacy AI SDK v4 `parameters` support and a zero-dependency
+  `zodToJsonSchema` hook for callers using Zod inputs.
+
 ## [0.2.0] - 2026-06-05
 
 ### Added
