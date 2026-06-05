@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-05
+
 ### Added
 
 - Added Vercel AI SDK adapter helpers: `toAISDKTool(...)` emits AI SDK v5
