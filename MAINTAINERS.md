@@ -16,4 +16,3 @@
 `tool-schema` is maintained as a public MIT package for provider-valid
 tool/function schemas. The primary maintainer controls the GitHub repository,
 npm package, release tags and security policy.
-

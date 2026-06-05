@@ -3,6 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/tool-schema.svg)](https://www.npmjs.com/package/tool-schema)
 [![npm downloads](https://img.shields.io/npm/dm/tool-schema.svg)](https://www.npmjs.com/package/tool-schema)
 [![CI](https://github.com/slegarraga/tool-schema/actions/workflows/ci.yml/badge.svg)](https://github.com/slegarraga/tool-schema/actions/workflows/ci.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/slegarraga/tool-schema/badge)](https://scorecard.dev/viewer/?uri=github.com/slegarraga/tool-schema)
 [![license](https://img.shields.io/npm/l/tool-schema.svg)](./LICENSE)
 [![zero dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](./package.json)
 
