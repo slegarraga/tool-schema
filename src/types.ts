@@ -87,6 +87,26 @@ export interface ToolSchemaOptions {
   anthropicStrict?: boolean;
 }
 
+/** A Vercel AI SDK-style tool object. AI SDK v5 uses `inputSchema`; v4 used `parameters`. */
+export interface AISDKToolDefinition {
+  description?: string;
+  inputSchema?: unknown;
+  parameters?: unknown;
+  strict?: boolean;
+  [key: string]: unknown;
+}
+
+/** Options for the Vercel AI SDK adapter helpers. */
+export interface AISDKAdapterOptions extends ToolSchemaOptions {
+  /** Emit the AI SDK v4 `parameters` key instead of the AI SDK v5 `inputSchema` key. */
+  aiSDKParameters?: boolean;
+  /**
+   * Optional converter for Zod or Standard Schema inputs. Pass `z.toJSONSchema`
+   * or a wrapper around it to keep this package zero-dependency.
+   */
+  zodToJsonSchema?: (schema: unknown) => JSONSchema;
+}
+
 /** MCP tool behavioural hints. See the Model Context Protocol spec. */
 export interface McpAnnotations {
   title?: string;

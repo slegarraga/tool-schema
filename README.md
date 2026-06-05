@@ -115,6 +115,39 @@ const schema = z.toJSONSchema(z.object({ city: z.string(), units: z.enum(['c', '
 const { tool } = toTool({ name: 'get_weather', schema }, { target: 'openai-strict' });
 ```
 
+## Vercel AI SDK adapter
+
+AI SDK v5 tools use `{ description?, inputSchema, strict? }`. Convert a normal
+`tool-schema` definition into that shape, while still applying provider rules:
+
+```ts
+import { toAISDKTool, fromAISDKTool } from 'tool-schema';
+
+const { tool: aiSdkTool } = toAISDKTool(
+  { name: 'get_weather', description: 'Get weather', schema },
+  { target: 'openai-strict' },
+);
+// aiSdkTool -> { description, inputSchema, strict: true }
+
+// AI SDK tool names usually live as keys in the `tools` object.
+const { tool: openaiTool } = fromAISDKTool('get_weather', aiSdkTool, { target: 'openai-strict' });
+// openaiTool -> { type: 'function', function: { name, description, parameters, strict: true } }
+```
+
+Use `{ aiSDKParameters: true }` for legacy AI SDK v4 `parameters` instead of
+`inputSchema`. For Zod inputs, keep `tool-schema` zero-dependency by passing a
+converter:
+
+```ts
+import { z } from 'zod';
+import { fromAISDKTool } from 'tool-schema';
+
+fromAISDKTool('get_weather', { inputSchema: z.object({ city: z.string() }) }, {
+  target: 'openai-strict',
+  zodToJsonSchema: z.toJSONSchema,
+});
+```
+
 ## Lint without transforming
 
 Want to know whether a schema is already valid for a provider, for example in a
