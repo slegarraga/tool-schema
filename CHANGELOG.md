@@ -6,6 +6,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-06-07
+
+### Fixed
+
+- Normalized the package `bin` path so npm no longer auto-corrects package
+  metadata during publish.
+
 ## [0.3.1] - 2026-06-07
 
 ### Fixed
