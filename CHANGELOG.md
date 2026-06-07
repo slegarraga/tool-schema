@@ -6,6 +6,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-06-07
+
+### Fixed
+
+- Applied strict object handling more consistently for nested schemas when
+  targeting providers that require `additionalProperties: false`.
+- Preserved object schema details more reliably across OpenAI, Gemini and AI SDK
+  conversions.
+
+### Changed
+
+- Expanded README guidance for provider-specific strict schema behavior and
+  nested object caveats.
+
 ## [0.3.0] - 2026-06-05
 
 ### Added

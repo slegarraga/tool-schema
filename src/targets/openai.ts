@@ -7,6 +7,7 @@ import {
   makeNullable,
   mapChildren,
   ensureObjectRoot,
+  pointerPath,
 } from '../util.js';
 
 /** Formats OpenAI Structured Outputs accepts. Others are dropped in strict mode. */
@@ -90,7 +91,7 @@ export function toOpenAIStrict(input: JSONSchema): TransformResult {
         if (!originalRequired.has(key)) {
           child = makeNullable(child);
           warnings.add(
-            `${path}/properties/${key}`,
+            pointerPath(path, 'properties', key),
             'forced-required',
             `Optional property '${key}' was made required and nullable for OpenAI strict mode.`,
           );

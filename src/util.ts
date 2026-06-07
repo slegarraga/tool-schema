@@ -47,17 +47,24 @@ export function isObjectSchema(schema: JSONSchema): boolean {
 export function makeNullable(schema: JSONSchema): JSONSchema {
   if (typeof schema.type === 'string') {
     if (schema.type === 'null') return schema;
-    return { ...schema, type: [schema.type, 'null'] };
+    return withNullEnum({ ...schema, type: [schema.type, 'null'] });
   }
   if (Array.isArray(schema.type)) {
-    if (schema.type.includes('null')) return schema;
-    return { ...schema, type: [...schema.type, 'null'] };
+    if (schema.type.includes('null')) return withNullEnum(schema);
+    return withNullEnum({ ...schema, type: [...schema.type, 'null'] });
   }
   if (Array.isArray(schema.anyOf)) {
     if (schema.anyOf.some((b) => typesOf(b).includes('null'))) return schema;
     return { ...schema, anyOf: [...schema.anyOf, { type: 'null' }] };
   }
   return { anyOf: [schema, { type: 'null' }] };
+}
+
+function withNullEnum(schema: JSONSchema): JSONSchema {
+  if (!Array.isArray(schema.enum) || schema.enum.some((value) => value === null)) {
+    return schema;
+  }
+  return { ...schema, enum: [...schema.enum, null] };
 }
 
 /**
@@ -67,16 +74,16 @@ export function makeNullable(schema: JSONSchema): JSONSchema {
  * (Gemini route A) cannot express recursion.
  */
 export function dereference(root: JSONSchema, warnings: Warnings): JSONSchema {
-  const defs: Record<string, JSONSchema> = {
-    ...(isPlainObject(root.definitions) ? (root.definitions as Record<string, JSONSchema>) : {}),
-    ...(isPlainObject(root.$defs) ? (root.$defs as Record<string, JSONSchema>) : {}),
-  };
-
   const resolve = (ref: string): JSONSchema | undefined => {
-    const m = /^#\/(?:\$defs|definitions)\/(.+)$/.exec(ref);
-    if (!m) return undefined;
-    const key = decodeURIComponent(m[1].replace(/~1/g, '/').replace(/~0/g, '~'));
-    return defs[key];
+    if (ref === '#') return root;
+    if (!ref.startsWith('#/')) return undefined;
+
+    let current: unknown = root;
+    for (const segment of ref.slice(2).split('/').map(decodePointerSegment)) {
+      if (!isPlainObject(current) && !Array.isArray(current)) return undefined;
+      current = (current as Record<string, unknown>)[segment];
+    }
+    return isPlainObject(current) ? (current as JSONSchema) : undefined;
   };
 
   const walk = (node: JSONSchema, path: string, seen: Set<string>): JSONSchema => {
@@ -95,13 +102,32 @@ export function dereference(root: JSONSchema, warnings: Warnings): JSONSchema {
       const merged = { ...clone(target), ...rest };
       return walk(merged, path, new Set([...seen, ref]));
     }
-    return mapChildren(node, path, (child, childPath) => walk(child, childPath, seen));
+    const { $defs: _defs, definitions: _definitions, ...withoutDefinitions } = node;
+    void _defs;
+    void _definitions;
+    return mapChildren(withoutDefinitions, path, (child, childPath) => walk(child, childPath, seen));
   };
 
   const out = walk(clone(root), '#', new Set());
   delete out.$defs;
   delete out.definitions;
   return out;
+}
+
+function decodePointerSegment(segment: string): string {
+  try {
+    return decodeURIComponent(segment).replace(/~1/g, '/').replace(/~0/g, '~');
+  } catch {
+    return segment.replace(/~1/g, '/').replace(/~0/g, '~');
+  }
+}
+
+function encodePointerSegment(segment: string): string {
+  return segment.replace(/~/g, '~0').replace(/\//g, '~1');
+}
+
+export function pointerPath(path: string, ...segments: Array<string | number>): string {
+  return `${path}/${segments.map((segment) => encodePointerSegment(String(segment))).join('/')}`;
 }
 
 /**
@@ -118,37 +144,37 @@ export function mapChildren(
   if (isPlainObject(out.properties)) {
     const props: Record<string, JSONSchema> = {};
     for (const [k, v] of Object.entries(out.properties as Record<string, JSONSchema>)) {
-      props[k] = fn(v, `${path}/properties/${k}`);
+      props[k] = fn(v, pointerPath(path, 'properties', k));
     }
     out.properties = props;
   }
 
   if (Array.isArray(out.items)) {
-    out.items = out.items.map((it, i) => fn(it, `${path}/items/${i}`));
+    out.items = out.items.map((it, i) => fn(it, pointerPath(path, 'items', i)));
   } else if (isPlainObject(out.items)) {
-    out.items = fn(out.items as JSONSchema, `${path}/items`);
+    out.items = fn(out.items as JSONSchema, pointerPath(path, 'items'));
   }
 
   if (isPlainObject(out.additionalProperties)) {
-    out.additionalProperties = fn(out.additionalProperties as JSONSchema, `${path}/additionalProperties`);
+    out.additionalProperties = fn(out.additionalProperties as JSONSchema, pointerPath(path, 'additionalProperties'));
   }
 
   for (const key of ['anyOf', 'oneOf', 'allOf'] as const) {
     const arr = out[key];
     if (Array.isArray(arr)) {
-      out[key] = arr.map((b, i) => fn(b, `${path}/${key}/${i}`));
+      out[key] = arr.map((b, i) => fn(b, pointerPath(path, key, i)));
     }
   }
 
-  if (isPlainObject(out.not)) out.not = fn(out.not as JSONSchema, `${path}/not`);
+  if (isPlainObject(out.not)) out.not = fn(out.not as JSONSchema, pointerPath(path, 'not'));
   for (const key of ['if', 'then', 'else'] as const) {
-    if (isPlainObject(out[key])) out[key] = fn(out[key] as JSONSchema, `${path}/${key}`);
+    if (isPlainObject(out[key])) out[key] = fn(out[key] as JSONSchema, pointerPath(path, key));
   }
 
   if (isPlainObject(out.patternProperties)) {
     const pp: Record<string, JSONSchema> = {};
     for (const [k, v] of Object.entries(out.patternProperties as Record<string, JSONSchema>)) {
-      pp[k] = fn(v, `${path}/patternProperties/${k}`);
+      pp[k] = fn(v, pointerPath(path, 'patternProperties', k));
     }
     out.patternProperties = pp;
   }
@@ -158,7 +184,7 @@ export function mapChildren(
     if (isPlainObject(map)) {
       const next: Record<string, JSONSchema> = {};
       for (const [k, v] of Object.entries(map as Record<string, JSONSchema>)) {
-        next[k] = fn(v as JSONSchema, `${path}/${key}/${k}`);
+        next[k] = fn(v as JSONSchema, pointerPath(path, key, k));
       }
       out[key] = next;
     }

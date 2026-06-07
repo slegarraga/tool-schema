@@ -12,7 +12,10 @@ const schema = {
 
 describe('Vercel AI SDK adapter', () => {
   it('emits AI SDK 5 inputSchema by default', () => {
-    const { tool } = toAISDKTool({ name: 'get_weather', description: 'Get weather', schema }, { target: 'openai-strict' });
+    const { tool } = toAISDKTool(
+      { name: 'get_weather', description: 'Get weather', schema },
+      { target: 'openai-strict' },
+    );
 
     expect(tool).toMatchObject({ description: 'Get weather', strict: true });
     expect(tool.inputSchema).toMatchObject({ type: 'object', additionalProperties: false });
@@ -45,7 +48,11 @@ describe('Vercel AI SDK adapter', () => {
   });
 
   it('accepts legacy AI SDK parameters as input', () => {
-    const { tool } = fromAISDKTool('get_weather', { description: 'Get weather', parameters: schema }, { target: 'anthropic' });
+    const { tool } = fromAISDKTool(
+      'get_weather',
+      { description: 'Get weather', parameters: schema },
+      { target: 'anthropic' },
+    );
 
     expect(tool).toMatchObject({ name: 'get_weather', description: 'Get weather' });
     expect(tool.input_schema).toBeDefined();
@@ -69,8 +76,8 @@ describe('Vercel AI SDK adapter', () => {
   });
 
   it('throws a helpful error for non-JSON-schema inputs without a converter', () => {
-    expect(() => fromAISDKTool('bad', { inputSchema: { _def: { typeName: 'ZodObject' } } }, { target: 'openai' })).toThrow(
-      /zodToJsonSchema|z\.toJSONSchema/,
-    );
+    expect(() =>
+      fromAISDKTool('bad', { inputSchema: { _def: { typeName: 'ZodObject' } } }, { target: 'openai' }),
+    ).toThrow(/zodToJsonSchema|z\.toJSONSchema/);
   });
 });

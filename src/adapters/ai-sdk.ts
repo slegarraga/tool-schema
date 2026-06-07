@@ -31,7 +31,11 @@ export function toAISDKTool(def: ToolDefinition, options: AISDKAdapterOptions = 
  * The tool name comes from the key in the AI SDK `tools` object:
  * `fromAISDKTool('get_weather', tools.get_weather, { target: 'openai-strict' })`.
  */
-export function fromAISDKTool(name: string, aiTool: AISDKToolDefinition, options: AISDKAdapterOptions = {}): ToolResult {
+export function fromAISDKTool(
+  name: string,
+  aiTool: AISDKToolDefinition,
+  options: AISDKAdapterOptions = {},
+): ToolResult {
   if (!isPlainObject(aiTool)) {
     throw new TypeError('fromAISDKTool expected an AI SDK tool object.');
   }

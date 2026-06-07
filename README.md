@@ -49,6 +49,33 @@ const { tool } = toTool({ name: 'get_weather', description: 'Get the weather', s
 // `units` becomes required and nullable, additionalProperties:false is added everywhere.
 ```
 
+Before:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "city": { "type": "string" },
+    "units": { "type": "string", "enum": ["c", "f"] }
+  },
+  "required": ["city"]
+}
+```
+
+After `target: 'openai-strict'`:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "city": { "type": "string" },
+    "units": { "type": ["string", "null"], "enum": ["c", "f", null] }
+  },
+  "required": ["city", "units"],
+  "additionalProperties": false
+}
+```
+
 The same definition, four providers:
 
 ```ts
@@ -142,10 +169,14 @@ converter:
 import { z } from 'zod';
 import { fromAISDKTool } from 'tool-schema';
 
-fromAISDKTool('get_weather', { inputSchema: z.object({ city: z.string() }) }, {
-  target: 'openai-strict',
-  zodToJsonSchema: z.toJSONSchema,
-});
+fromAISDKTool(
+  'get_weather',
+  { inputSchema: z.object({ city: z.string() }) },
+  {
+    target: 'openai-strict',
+    zodToJsonSchema: z.toJSONSchema,
+  },
+);
 ```
 
 ## Lint without transforming
@@ -161,6 +192,27 @@ if (!ok) {
   for (const issue of issues) console.warn(`${issue.path}: ${issue.message}`);
 }
 ```
+
+## API reference
+
+| Function                             | Use it when                                                                       | Returns                       |
+| ------------------------------------ | --------------------------------------------------------------------------------- | ----------------------------- |
+| `toToolSchema(schema, options)`      | You already build the provider tool envelope and only need compatible parameters. | `{ schema, warnings, lossy }` |
+| `toTool(def, options)`               | You want the full provider-shaped tool/function declaration.                      | `{ tool, warnings, lossy }`   |
+| `lintToolSchema(schema, options)`    | You want CI/test feedback without using the converted schema.                     | `{ ok, issues }`              |
+| `toAISDKTool(def, options)`          | You want a Vercel AI SDK tool with converted `inputSchema`.                       | `{ tool, warnings, lossy }`   |
+| `fromAISDKTool(name, tool, options)` | You want to convert an AI SDK tool into a provider tool.                          | `{ tool, warnings, lossy }`   |
+
+Options:
+
+| Option                 | Applies to                | Default    | Effect                                                                               |
+| ---------------------- | ------------------------- | ---------- | ------------------------------------------------------------------------------------ |
+| `target`               | all functions             | `'openai'` | One of `openai`, `openai-strict`, `anthropic`, `gemini`, `gemini-jsonschema`, `mcp`. |
+| `openaiResponses`      | `toTool`, `fromAISDKTool` | `false`    | Emits the flattened OpenAI Responses API tool shape.                                 |
+| `geminiUppercaseTypes` | `gemini`                  | `false`    | Emits `OBJECT`, `STRING`, etc. for raw REST clients that expect enum type names.     |
+| `anthropicStrict`      | `toTool`, `fromAISDKTool` | `false`    | Adds `strict: true` to Anthropic tool declarations.                                  |
+| `aiSDKParameters`      | `toAISDKTool`             | `false`    | Emits legacy AI SDK v4 `parameters` instead of v5 `inputSchema`.                     |
+| `zodToJsonSchema`      | AI SDK helpers            | none       | Converts Zod/Standard Schema inputs without adding a runtime dependency.             |
 
 ## Targets
 
@@ -206,6 +258,22 @@ to the node), a stable `code`, and a human readable `message`. Codes include
 `inlined-ref`, `collapsed-nullable`, `enum-coerced`, `merged-allof`,
 `unsupported-format`, `limit-exceeded` and `invalid-name`. `lossy` is `true`
 whenever a keyword or constraint had to be dropped.
+
+## Caveats
+
+`tool-schema` is a compatibility transformer, not a full JSON Schema validator.
+It preserves unknown keywords for permissive targets and only strips or rewrites
+keywords that are known to break a target.
+
+Gemini has two useful routes. `target: 'gemini'` emits the narrower `parameters`
+schema: local `$ref` pointers are inlined, recursive refs are replaced with `{}`,
+and unsupported composition keywords are stripped with warnings. Use
+`target: 'gemini-jsonschema'` when your Gemini client accepts
+`parametersJsonSchema` and you want to keep richer JSON Schema.
+
+OpenAI strict mode has no optional properties. Optional inputs are converted to
+required nullable fields; if an optional field uses `enum`, `null` is added to
+the enum so the nullable value is actually valid JSON Schema.
 
 ## Why zero dependencies
 

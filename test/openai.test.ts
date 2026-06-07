@@ -44,6 +44,60 @@ describe('openai-strict', () => {
     expect((schema.properties as Record<string, JSONSchema>).b.type).toEqual(['number', 'null']);
   });
 
+  it('adds null to optional enum values when making them nullable', () => {
+    const { schema } = toToolSchema(
+      {
+        type: 'object',
+        properties: {
+          city: { type: 'string' },
+          units: { type: 'string', enum: ['c', 'f'] },
+        },
+        required: ['city'],
+      },
+      { target: 'openai-strict' },
+    );
+    const units = (schema.properties as Record<string, JSONSchema>).units;
+    expect(units.type).toEqual(['string', 'null']);
+    expect(units.enum).toEqual(['c', 'f', null]);
+    expect(schema.required).toEqual(['city', 'units']);
+  });
+
+  it('adds null to already nullable optional enum values', () => {
+    const { schema } = toToolSchema(
+      {
+        type: 'object',
+        properties: {
+          units: { type: ['string', 'null'], enum: ['c', 'f'] },
+        },
+        required: [],
+      },
+      { target: 'openai-strict' },
+    );
+    const units = (schema.properties as Record<string, JSONSchema>).units;
+    expect(units.type).toEqual(['string', 'null']);
+    expect(units.enum).toEqual(['c', 'f', null]);
+    expect(schema.required).toEqual(['units']);
+  });
+
+  it('reports warning paths as escaped JSON Pointers', () => {
+    const { warnings } = toToolSchema(
+      {
+        type: 'object',
+        properties: {
+          'a/b~c': { type: 'string' },
+        },
+        required: [],
+      },
+      { target: 'openai-strict' },
+    );
+    expect(warnings).toContainEqual(
+      expect.objectContaining({
+        path: '#/properties/a~1b~0c',
+        code: 'forced-required',
+      }),
+    );
+  });
+
   it('applies additionalProperties:false to nested objects', () => {
     const { schema } = toToolSchema(
       {
