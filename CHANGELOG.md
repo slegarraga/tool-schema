@@ -6,6 +6,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-06-11
+
+### Changed
+
+- Published README download badge updates so the npm package page shows the refreshed 30-day download badge.
+
 ## [0.3.2] - 2026-06-07
 
 ### Fixed
