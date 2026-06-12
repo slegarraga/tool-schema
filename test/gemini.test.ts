@@ -23,6 +23,97 @@ describe('gemini (route A)', () => {
     expect(warnings.some((w) => w.code === 'stripped-keyword')).toBe(true);
   });
 
+  it('strips unknown and 2020-12 keywords the proto does not have', () => {
+    const { schema } = toToolSchema(
+      {
+        type: 'object',
+        properties: {
+          a: { type: 'array', prefixItems: [{ type: 'string' }], examples: ['x'] },
+        },
+        required: ['a'],
+        $comment: 'internal note',
+      },
+      { target: 'gemini' },
+    );
+    expect(schema.$comment).toBeUndefined();
+    expect(props(schema).a.prefixItems).toBeUndefined();
+    expect(props(schema).a.examples).toBeUndefined();
+  });
+
+  it('keeps every Schema proto field', () => {
+    const input: JSONSchema = {
+      type: 'object',
+      title: 'Range',
+      propertyOrdering: ['lo', 'hi'],
+      properties: {
+        lo: { type: 'number', minimum: 0, maximum: 10, default: 0, example: 1 },
+        hi: { type: 'string', minLength: 1, maxLength: 5, pattern: '^[a-z]+$', format: 'date-time' },
+      },
+      required: ['lo', 'hi'],
+      minProperties: 2,
+      maxProperties: 2,
+    };
+    const { schema, warnings } = toToolSchema(input, { target: 'gemini' });
+    expect(schema).toEqual(input);
+    expect(warnings).toEqual([]);
+  });
+
+  it('converts oneOf to anyOf instead of dropping the union', () => {
+    const { schema, warnings } = toToolSchema(
+      {
+        type: 'object',
+        properties: { b: { oneOf: [{ type: 'string' }, { type: 'number' }] } },
+        required: ['b'],
+      },
+      { target: 'gemini' },
+    );
+    expect(props(schema).b.oneOf).toBeUndefined();
+    expect(props(schema).b.anyOf).toHaveLength(2);
+    expect(warnings.some((w) => w.code === 'converted-keyword')).toBe(true);
+  });
+
+  it('merges allOf parts instead of dropping them', () => {
+    const { schema } = toToolSchema(
+      {
+        type: 'object',
+        allOf: [{ properties: { a: { type: 'string' } }, required: ['a'] }, { properties: { b: { type: 'number' } } }],
+      },
+      { target: 'gemini' },
+    );
+    expect(schema.allOf).toBeUndefined();
+    expect(props(schema).a.type).toBe('string');
+    expect(props(schema).b.type).toBe('number');
+    expect(schema.required).toEqual(['a']);
+  });
+
+  it('converts const to a single-value enum', () => {
+    const { schema, warnings } = toToolSchema(
+      { type: 'object', properties: { unit: { const: 'celsius' } }, required: ['unit'] },
+      { target: 'gemini' },
+    );
+    expect(props(schema).unit.const).toBeUndefined();
+    expect(props(schema).unit.enum).toEqual(['celsius']);
+    expect(props(schema).unit.type).toBe('string');
+    expect(warnings.some((w) => w.code === 'converted-keyword')).toBe(true);
+  });
+
+  it('collapses tuple items into a single items schema', () => {
+    const { schema } = toToolSchema(
+      {
+        type: 'object',
+        properties: {
+          single: { type: 'array', items: [{ type: 'string' }] },
+          pair: { type: 'array', items: [{ type: 'string' }, { type: 'number' }] },
+        },
+        required: ['single', 'pair'],
+      },
+      { target: 'gemini' },
+    );
+    expect(props(schema).single.items).toEqual({ type: 'string' });
+    const pairItems = props(schema).pair.items as JSONSchema;
+    expect(pairItems.anyOf).toHaveLength(2);
+  });
+
   it('inlines local $ref and removes $defs', () => {
     const { schema } = toToolSchema(
       {

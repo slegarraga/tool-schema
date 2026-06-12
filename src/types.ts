@@ -44,6 +44,7 @@ export interface Warning {
 
 export type WarningCode =
   | 'stripped-keyword'
+  | 'converted-keyword'
   | 'unsupported-format'
   | 'forced-required'
   | 'forced-additional-properties'

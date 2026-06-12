@@ -124,7 +124,7 @@ import { toToolSchema } from 'tool-schema';
 
 const { schema, warnings, lossy } = toToolSchema(mySchema, { target: 'gemini' });
 
-// schema  -> the Gemini valid schema ($ref inlined, oneOf stripped, nullable applied)
+// schema  -> the Gemini valid schema ($ref inlined, oneOf converted to anyOf, nullable applied)
 // warnings -> every adjustment made, with a JSON Pointer path and a stable code
 // lossy   -> true if any information had to be dropped
 ```
@@ -216,26 +216,26 @@ Options:
 
 ## Targets
 
-| Target              | Output key             | What it does                                                                                                                       |
-| ------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `openai`            | `function.parameters`  | Ensures an object root. Otherwise pass through.                                                                                    |
-| `openai-strict`     | `function.parameters`  | Structured Outputs: `additionalProperties:false`, all required, optionals nullable, unsupported keywords stripped, `allOf` merged. |
-| `anthropic`         | `input_schema`         | Permissive. Ensures an object root.                                                                                                |
-| `gemini`            | `parameters`           | OpenAPI subset: inlines `$ref`, strips `oneOf`/`allOf`/`additionalProperties`, `nullable: true`, string enums.                     |
-| `gemini-jsonschema` | `parametersJsonSchema` | Gemini's richer route. Keeps `$ref` and more.                                                                                      |
-| `mcp`               | `inputSchema`          | Most permissive for input. Ensures an object root. Supports `annotations` and `outputSchema`.                                      |
+| Target              | Output key             | What it does                                                                                                                                                     |
+| ------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `openai`            | `function.parameters`  | Ensures an object root. Otherwise pass through.                                                                                                                  |
+| `openai-strict`     | `function.parameters`  | Structured Outputs: `additionalProperties:false`, all required, optionals nullable, `allOf` merged, `oneOf` converted to `anyOf`, unsupported keywords stripped. |
+| `anthropic`         | `input_schema`         | Permissive. Ensures an object root.                                                                                                                              |
+| `gemini`            | `parameters`           | OpenAPI subset: inlines `$ref`, merges `allOf`, converts `oneOf` to `anyOf` and `const` to `enum`, strips non-proto keywords, `nullable: true`, string enums.    |
+| `gemini-jsonschema` | `parametersJsonSchema` | Gemini's richer route. Keeps `$ref` and more.                                                                                                                    |
+| `mcp`               | `inputSchema`          | Most permissive for input. Ensures an object root. Supports `annotations` and `outputSchema`.                                                                    |
 
 ## Provider rules at a glance
 
-| Constraint                           | openai         | openai-strict            | anthropic      | gemini           | mcp        |
-| ------------------------------------ | -------------- | ------------------------ | -------------- | ---------------- | ---------- |
-| Root must be object                  | yes            | yes                      | yes            | yes              | input only |
-| `additionalProperties: false` forced | no             | yes (every object)       | no             | removed          | no         |
-| All properties required              | no             | yes (optionals nullable) | no             | no               | no         |
-| `$ref` / `$defs`                     | keep           | keep                     | keep           | inlined          | keep       |
-| `oneOf` / `allOf` / `not`            | keep           | stripped / merged        | keep           | stripped         | keep       |
-| Nullability                          | `["t","null"]` | `["t","null"]`           | `["t","null"]` | `nullable: true` | any        |
-| Structured output schema             | no             | no                       | no             | no               | yes        |
+| Constraint                           | openai         | openai-strict            | anthropic      | gemini                 | mcp        |
+| ------------------------------------ | -------------- | ------------------------ | -------------- | ---------------------- | ---------- |
+| Root must be object                  | yes            | yes                      | yes            | yes                    | input only |
+| `additionalProperties: false` forced | no             | yes (every object)       | no             | removed                | no         |
+| All properties required              | no             | yes (optionals nullable) | no             | no                     | no         |
+| `$ref` / `$defs`                     | keep           | keep                     | keep           | inlined                | keep       |
+| `oneOf` / `allOf` / `not`            | keep           | anyOf / merged / strip   | keep           | anyOf / merged / strip | keep       |
+| Nullability                          | `["t","null"]` | `["t","null"]`           | `["t","null"]` | `nullable: true`       | any        |
+| Structured output schema             | no             | no                       | no             | no                     | yes        |
 
 ## CLI
 

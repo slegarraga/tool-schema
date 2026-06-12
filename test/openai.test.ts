@@ -25,6 +25,53 @@ describe('openai (non strict)', () => {
 });
 
 describe('openai-strict', () => {
+  it('converts oneOf to anyOf (oneOf is unsupported in strict mode)', () => {
+    const { schema, warnings, lossy } = toToolSchema(
+      {
+        type: 'object',
+        properties: { a: { oneOf: [{ type: 'string' }, { type: 'number' }] } },
+        required: ['a'],
+      },
+      { target: 'openai-strict' },
+    );
+    const a = (schema.properties as Record<string, JSONSchema>).a;
+    expect(a.oneOf).toBeUndefined();
+    expect(a.anyOf).toHaveLength(2);
+    expect(warnings.some((w) => w.code === 'converted-keyword')).toBe(true);
+    expect(lossy).toBe(true);
+  });
+
+  it('keeps patternProperties (only excluded for fine-tuned models)', () => {
+    const { schema, warnings } = toToolSchema(
+      {
+        type: 'object',
+        properties: { a: { type: 'string' } },
+        required: ['a'],
+        patternProperties: { '^x-': { type: 'string' } },
+      },
+      { target: 'openai-strict' },
+    );
+    expect(schema.patternProperties).toBeDefined();
+    expect(warnings.some((w) => w.code === 'stripped-keyword' && w.message.includes('patternProperties'))).toBe(false);
+  });
+
+  it('strips tuple and 2020-12 applicators strict mode rejects', () => {
+    const { schema, warnings } = toToolSchema(
+      {
+        type: 'object',
+        properties: {
+          a: { type: 'array', prefixItems: [{ type: 'string' }], contains: { type: 'number' } },
+        },
+        required: ['a'],
+      },
+      { target: 'openai-strict' },
+    );
+    const a = (schema.properties as Record<string, JSONSchema>).a;
+    expect(a.prefixItems).toBeUndefined();
+    expect(a.contains).toBeUndefined();
+    expect(warnings.filter((w) => w.code === 'stripped-keyword')).toHaveLength(2);
+  });
+
   it('forces additionalProperties:false and makes every property required', () => {
     const { schema, lossy } = toToolSchema(
       { type: 'object', properties: { a: { type: 'string' }, b: { type: 'number' } }, required: ['a'] },

@@ -6,6 +6,32 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-12
+
+### Changed
+
+- OpenAI strict mode now converts `oneOf` to `anyOf` (OpenAI rejects `oneOf`;
+  previously it passed through and failed at the API).
+- OpenAI strict mode no longer strips `patternProperties`: current OpenAI docs
+  only exclude it for fine-tuned models.
+- OpenAI strict mode strips the remaining unsupported 2020-12 applicators
+  (`prefixItems`, `contains`, `minContains`, `maxContains`, `propertyNames`,
+  `unevaluatedItems`).
+- The Gemini route A target now keeps exactly the fields of the `Schema`
+  proto (allowlist verified against the REST reference), so unknown keywords
+  such as `prefixItems` or `examples` can no longer leak through and fail the
+  request with an unknown-field error. Newly preserved proto fields:
+  `default`, `example`, `propertyOrdering`.
+- Gemini route A converts instead of dropping where an equivalent exists:
+  `allOf` is merged, `oneOf` becomes `anyOf`, `const` becomes a single-value
+  `enum`, and tuple-form `items` collapse to `items` / `items.anyOf`.
+
+### Added
+
+- New `converted-keyword` warning code reported for the conversions above.
+- `mapChildren` now walks `prefixItems`, `contains`, `propertyNames`,
+  `unevaluatedItems` and `unevaluatedProperties` subschemas.
+
 ## [0.3.3] - 2026-06-11
 
 ### Changed

@@ -6,6 +6,8 @@ import {
   isPlainObject,
   makeNullable,
   mapChildren,
+  mergeAllOf,
+  oneOfToAnyOf,
   ensureObjectRoot,
   pointerPath,
 } from '../util.js';
@@ -23,7 +25,11 @@ const FORMAT_WHITELIST = new Set([
   'uuid',
 ]);
 
-/** Keywords OpenAI strict mode rejects outright. */
+/**
+ * Keywords OpenAI strict mode rejects outright. `patternProperties` is not
+ * listed: current docs only exclude it for fine-tuned models. `oneOf` is also
+ * unsupported but is converted to `anyOf` rather than stripped.
+ */
 const UNSUPPORTED = [
   'not',
   'if',
@@ -31,8 +37,13 @@ const UNSUPPORTED = [
   'else',
   'dependentRequired',
   'dependentSchemas',
-  'patternProperties',
   'unevaluatedProperties',
+  'unevaluatedItems',
+  'prefixItems',
+  'contains',
+  'minContains',
+  'maxContains',
+  'propertyNames',
 ] as const;
 
 const MAX_PROPERTIES = 5000;
@@ -60,8 +71,9 @@ export function toOpenAIStrict(input: JSONSchema): TransformResult {
     let s: JSONSchema = { ...node };
 
     if (Array.isArray(s.allOf)) {
-      s = mergeAllOf(s, path, warnings);
+      s = mergeAllOf(s, path, warnings, 'OpenAI strict mode');
     }
+    s = oneOfToAnyOf(s, path, warnings, 'OpenAI strict mode');
 
     for (const kw of UNSUPPORTED) {
       if (kw in s) {
@@ -128,35 +140,6 @@ export function toOpenAIStrict(input: JSONSchema): TransformResult {
   const schema = ensureObjectRoot(transform(clone(input), '#'), warnings, 'OpenAI strict mode');
   checkLimits(schema, warnings);
   return { schema, warnings: warnings.list, lossy: warnings.lossy };
-}
-
-/** Shallow merges `allOf` object subschemas into the parent, then drops `allOf`. */
-function mergeAllOf(node: JSONSchema, path: string, warnings: Warnings): JSONSchema {
-  const parts = node.allOf as JSONSchema[];
-  const { allOf: _drop, ...base } = node;
-  void _drop;
-  const merged: JSONSchema = { ...base };
-  const props: Record<string, JSONSchema> = isPlainObject(merged.properties)
-    ? { ...(merged.properties as Record<string, JSONSchema>) }
-    : {};
-  const required = new Set<string>(Array.isArray(merged.required) ? merged.required : []);
-
-  for (const part of parts) {
-    if (!isPlainObject(part)) continue;
-    if (isPlainObject(part.properties)) {
-      Object.assign(props, part.properties);
-    }
-    if (Array.isArray(part.required)) {
-      for (const r of part.required) required.add(r);
-    }
-    if (part.type && !merged.type) merged.type = part.type;
-  }
-
-  if (Object.keys(props).length > 0) merged.properties = props;
-  if (required.size > 0) merged.required = [...required];
-  if (!merged.type && (merged.properties || isObjectSchema(merged))) merged.type = 'object';
-  warnings.add(path, 'merged-allof', "Merged 'allOf' subschemas into the parent (unsupported in strict mode).");
-  return merged;
 }
 
 function checkLimits(schema: JSONSchema, warnings: Warnings): void {

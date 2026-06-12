@@ -155,6 +155,14 @@ export function mapChildren(
     out.items = fn(out.items as JSONSchema, pointerPath(path, 'items'));
   }
 
+  if (Array.isArray(out.prefixItems)) {
+    out.prefixItems = out.prefixItems.map((it, i) => fn(it as JSONSchema, pointerPath(path, 'prefixItems', i)));
+  }
+
+  for (const key of ['contains', 'propertyNames', 'unevaluatedItems', 'unevaluatedProperties'] as const) {
+    if (isPlainObject(out[key])) out[key] = fn(out[key] as JSONSchema, pointerPath(path, key));
+  }
+
   if (isPlainObject(out.additionalProperties)) {
     out.additionalProperties = fn(out.additionalProperties as JSONSchema, pointerPath(path, 'additionalProperties'));
   }
@@ -190,6 +198,58 @@ export function mapChildren(
     }
   }
 
+  return out;
+}
+
+/**
+ * Shallow merges `allOf` object subschemas into the parent, then drops `allOf`.
+ * Used by targets that cannot express `allOf` (OpenAI strict mode, Gemini
+ * route A). Merging keeps `properties` / `required` / `type`; other part
+ * keywords are dropped, so the result is reported as lossy.
+ */
+export function mergeAllOf(node: JSONSchema, path: string, warnings: Warnings, target: string): JSONSchema {
+  const parts = node.allOf as JSONSchema[];
+  const { allOf: _drop, ...base } = node;
+  void _drop;
+  const merged: JSONSchema = { ...base };
+  const props: Record<string, JSONSchema> = isPlainObject(merged.properties)
+    ? { ...(merged.properties as Record<string, JSONSchema>) }
+    : {};
+  const required = new Set<string>(Array.isArray(merged.required) ? merged.required : []);
+
+  for (const part of parts) {
+    if (!isPlainObject(part)) continue;
+    if (isPlainObject(part.properties)) {
+      Object.assign(props, part.properties);
+    }
+    if (Array.isArray(part.required)) {
+      for (const r of part.required) required.add(r);
+    }
+    if (part.type && !merged.type) merged.type = part.type;
+  }
+
+  if (Object.keys(props).length > 0) merged.properties = props;
+  if (required.size > 0) merged.required = [...required];
+  if (!merged.type && (merged.properties || isObjectSchema(merged))) merged.type = 'object';
+  warnings.add(
+    path,
+    'merged-allof',
+    `Merged 'allOf' subschemas into the parent ('allOf' is unsupported by ${target}).`,
+  );
+  return merged;
+}
+
+/**
+ * Converts `oneOf` into `anyOf` for targets that only support `anyOf`. The
+ * exclusivity constraint is relaxed, so the change is reported as lossy. When
+ * the node already has an `anyOf`, the branches are concatenated.
+ */
+export function oneOfToAnyOf(node: JSONSchema, path: string, warnings: Warnings, target: string): JSONSchema {
+  if (!Array.isArray(node.oneOf)) return node;
+  const { oneOf: branches, ...rest } = node;
+  const out: JSONSchema = { ...rest };
+  out.anyOf = Array.isArray(out.anyOf) ? [...out.anyOf, ...(branches as JSONSchema[])] : (branches as JSONSchema[]);
+  warnings.add(path, 'converted-keyword', `Converted 'oneOf' to 'anyOf' ('oneOf' is unsupported by ${target}).`);
   return out;
 }
 

@@ -1,36 +1,47 @@
 import type { JSONSchema, TransformResult } from '../types.js';
-import { Warnings, clone, dereference, ensureObjectRoot, isPlainObject, mapChildren, typesOf } from '../util.js';
+import {
+  Warnings,
+  clone,
+  dereference,
+  ensureObjectRoot,
+  isPlainObject,
+  mapChildren,
+  mergeAllOf,
+  oneOfToAnyOf,
+  typesOf,
+} from '../util.js';
 
 /**
- * Keywords absent from Gemini's `Schema` proto (route A). Sending them either
- * errors or is silently ignored, so they are stripped.
+ * The fields of Gemini's `Schema` proto (route A), verified against the REST
+ * API reference. The REST API rejects unknown fields ("Invalid JSON payload
+ * received. Unknown name ..."), so route A keeps strictly this set: anything
+ * else is converted when an equivalent exists (`allOf`, `oneOf`, `const`,
+ * tuple `items`) and stripped otherwise.
  */
-const STRIP = [
-  '$schema',
-  '$id',
-  '$anchor',
-  '$ref',
-  'oneOf',
-  'allOf',
-  'not',
-  'if',
-  'then',
-  'else',
-  'additionalProperties',
-  'patternProperties',
-  'unevaluatedProperties',
-  'const',
-  'dependentRequired',
-  'dependentSchemas',
-  'multipleOf',
-  'exclusiveMinimum',
-  'exclusiveMaximum',
-  'uniqueItems',
-  'contentEncoding',
-  'contentMediaType',
-  '$defs',
-  'definitions',
-] as const;
+const PROTO_FIELDS = new Set([
+  'type',
+  'format',
+  'title',
+  'description',
+  'nullable',
+  'default',
+  'enum',
+  'example',
+  'items',
+  'minItems',
+  'maxItems',
+  'properties',
+  'required',
+  'minProperties',
+  'maxProperties',
+  'minLength',
+  'maxLength',
+  'pattern',
+  'minimum',
+  'maximum',
+  'anyOf',
+  'propertyOrdering',
+]);
 
 const TYPE_UPPER: Record<string, string> = {
   string: 'STRING',
@@ -61,8 +72,16 @@ export function toGemini(input: JSONSchema, options: GeminiOptions = {}): Transf
     if (!isPlainObject(node)) return node;
     let s: JSONSchema = { ...node };
 
-    for (const kw of STRIP) {
-      if (kw in s) {
+    // Convert what has an equivalent before stripping what does not.
+    if (Array.isArray(s.allOf)) {
+      s = mergeAllOf(s, path, warnings, 'Gemini (route A)');
+    }
+    s = oneOfToAnyOf(s, path, warnings, 'Gemini (route A)');
+    s = constToEnum(s, path, warnings);
+    s = flattenTupleItems(s, path, warnings);
+
+    for (const kw of Object.keys(s)) {
+      if (!PROTO_FIELDS.has(kw)) {
         delete s[kw];
         warnings.add(path, 'stripped-keyword', `'${kw}' is not supported by Gemini (route A); removed.`);
       }
@@ -97,6 +116,56 @@ export function toGeminiJsonSchema(input: JSONSchema): TransformResult {
   const warnings = new Warnings();
   const schema = ensureObjectRoot(clone(input), warnings, 'Gemini (parametersJsonSchema)');
   return { schema, warnings: warnings.list, lossy: warnings.lossy };
+}
+
+/** Converts `const: x` into the equivalent single-value `enum: [x]`. */
+function constToEnum(node: JSONSchema, path: string, warnings: Warnings): JSONSchema {
+  if (!('const' in node)) return node;
+  const { const: value, ...rest } = node;
+  const out: JSONSchema = { ...rest };
+  if (!Array.isArray(out.enum)) {
+    out.enum = [value];
+    warnings.add(
+      path,
+      'converted-keyword',
+      "Converted 'const' to a single-value 'enum' ('const' is unsupported by Gemini route A).",
+      false,
+    );
+  } else {
+    warnings.add(path, 'stripped-keyword', "'const' is not supported by Gemini (route A); removed.");
+  }
+  return out;
+}
+
+/**
+ * Gemini's `items` is a single schema. Tuple (array form) `items` collapse to
+ * the single schema when the tuple has one entry, or to an `anyOf` of the
+ * entries otherwise (the positional constraint is lost).
+ */
+function flattenTupleItems(node: JSONSchema, path: string, warnings: Warnings): JSONSchema {
+  if (!Array.isArray(node.items)) return node;
+  const parts = node.items;
+  const out: JSONSchema = { ...node };
+  if (parts.length === 1) {
+    out.items = parts[0];
+    warnings.add(
+      path,
+      'converted-keyword',
+      'Collapsed a single-entry tuple `items` into a plain `items` schema.',
+      false,
+    );
+  } else if (parts.length === 0) {
+    delete out.items;
+    warnings.add(path, 'stripped-keyword', 'Removed an empty tuple `items` array.', false);
+  } else {
+    out.items = { anyOf: parts };
+    warnings.add(
+      path,
+      'converted-keyword',
+      'Converted tuple `items` into `items: { anyOf: [...] }`; Gemini cannot express per-position schemas.',
+    );
+  }
+  return out;
 }
 
 /** Converts `type: ['string', 'null']` into `type: 'string', nullable: true`. */
