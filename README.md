@@ -4,10 +4,12 @@
 [![npm downloads](https://img.shields.io/npm/dm/tool-schema?logo=npm&label=downloads)](https://www.npmjs.com/package/tool-schema)
 [![CI](https://github.com/slegarraga/tool-schema/actions/workflows/ci.yml/badge.svg)](https://github.com/slegarraga/tool-schema/actions/workflows/ci.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/slegarraga/tool-schema/badge)](https://scorecard.dev/viewer/?uri=github.com/slegarraga/tool-schema)
+[![install size](https://packagephobia.com/badge?p=tool-schema)](https://packagephobia.com/result?p=tool-schema)
+[![bundle size](https://img.shields.io/bundlephobia/minzip/tool-schema?label=min%2Bgzip)](https://bundlephobia.com/package/tool-schema)
 [![license](https://img.shields.io/npm/l/tool-schema.svg)](./LICENSE)
 [![zero dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](./package.json)
 
-One JSON Schema in, a valid tool / function calling schema out, for **OpenAI**, **Anthropic**, **Gemini** and **MCP**. Zero dependencies.
+Write your tool schema once, get a valid definition for **OpenAI**, **Anthropic**, **Gemini** and **MCP** without touching provider-specific rules. Zero dependencies.
 
 Security posture is tracked in [docs/security-posture.md](./docs/security-posture.md),
 including CodeQL, OpenSSF Scorecard, Dependabot and branch rules.
@@ -113,6 +115,71 @@ toTool(
 );
 // -> { name, description, inputSchema, outputSchema }
 ```
+
+## Real-world recipes
+
+These show `tool-schema` inside actual API calls. Both examples use the same schema definition.
+
+```ts
+import { toTool } from 'tool-schema';
+
+const def = {
+  name: 'get_weather',
+  description: 'Return current weather for a city',
+  schema: {
+    type: 'object',
+    properties: {
+      city: { type: 'string', description: 'City name' },
+      units: { type: 'string', enum: ['c', 'f'] },
+    },
+    required: ['city'],
+  },
+};
+```
+
+### OpenAI (and OpenAI-compatible providers)
+
+```ts
+import OpenAI from 'openai';
+
+const client = new OpenAI();
+const { tool } = toTool(def, { target: 'openai-strict' });
+
+const res = await client.chat.completions.create({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: 'What is the weather in Santiago?' }],
+  tools: [tool], // provider-valid, no 400 errors
+});
+
+const raw = res.choices[0].message.content ?? '';
+```
+
+The same `toTool(def, { target: 'openai-strict' })` call works with any OpenAI-compatible
+endpoint: Groq, DeepSeek and OpenRouter all accept the same `tools[]` shape.
+
+### Anthropic
+
+```ts
+import Anthropic from '@anthropic-ai/sdk';
+
+const client = new Anthropic();
+const { tool } = toTool(def, { target: 'anthropic' });
+
+const msg = await client.messages.create({
+  model: 'claude-opus-4-5',
+  max_tokens: 1024,
+  messages: [{ role: 'user', content: 'What is the weather in Santiago?' }],
+  tools: [tool], // Anthropic shape: { name, description, input_schema }
+});
+
+const raw = msg.content.find((b) => b.type === 'text')?.text ?? '';
+```
+
+> **Why not hand-write per-provider schemas?** Every provider has a slightly different
+> required shape, and the differences compound as you add providers. OpenAI strict
+> mode alone has five rules that interact (object root, all-required, nullable optionals,
+> enum null extension, banned keywords). Writing and maintaining these by hand across
+> four providers is the kind of error-prone boilerplate `tool-schema` eliminates.
 
 ## Convert just the schema
 
@@ -275,17 +342,34 @@ OpenAI strict mode has no optional properties. Optional inputs are converted to
 required nullable fields; if an optional field uses `enum`, `null` is added to
 the enum so the nullable value is actually valid JSON Schema.
 
+## Why not X?
+
+**Hand-rolling per-provider schemas** works for one provider and one schema, but
+the rules compound fast. OpenAI strict alone has five interacting constraints.
+Maintaining separate schema objects for four providers is the kind of boilerplate
+that drifts silently until a `400` surfaces in production.
+
+**`zod-to-openai-tool` / `zod-to-anthropic-tool`** and similar packages are
+schema-library-specific and single-provider. `tool-schema` accepts plain JSON
+Schema (which Zod 4 emits natively), covers four providers from one call, and
+adds zero transitive dependencies to your bundle.
+
+**`@modelcontextprotocol/sdk`** handles the MCP wire protocol but does not
+transform schemas for other providers. `tool-schema` complements it: use the
+SDK for transport, `toTool(def, { target: 'mcp' })` for the schema shape.
+
 ## Why zero dependencies
 
 This library is meant to sit deep in agent and tool pipelines. No transitive
 dependencies means no supply chain surface, no version conflicts, and a tiny
 install. It uses only the JSON Schema you pass in and the platform `structuredClone`.
 
-## Part of a set
+## Related
 
-`tool-schema` pairs with [`llm-messages`](https://github.com/slegarraga/llm-messages),
-which converts your chat **conversations** across the same providers. Together
-they let you write an agent once and run it on any LLM.
+- [`json-from-llm`](https://www.npmjs.com/package/json-from-llm): extract valid JSON from an LLM response, even inside reasoning tags, fenced blocks or prose
+- [`llm-sse`](https://www.npmjs.com/package/llm-sse): parse streaming SSE from LLM providers into typed, provider-agnostic events
+- [`llm-messages`](https://www.npmjs.com/package/llm-messages): convert chat messages between OpenAI, Anthropic and Gemini formats
+- [`llm-errors`](https://www.npmjs.com/package/llm-errors): normalize provider errors (rate limits, retries, status) into one shape
 
 ## License
 
