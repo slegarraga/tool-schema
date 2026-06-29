@@ -166,7 +166,7 @@ const client = new Anthropic();
 const { tool } = toTool(def, { target: 'anthropic' });
 
 const msg = await client.messages.create({
-  model: 'claude-opus-4-5',
+  model: 'claude-opus-4-8',
   max_tokens: 1024,
   messages: [{ role: 'user', content: 'What is the weather in Santiago?' }],
   tools: [tool], // Anthropic shape: { name, description, input_schema }
